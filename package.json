@@ -1,0 +1,28 @@
+{
+  "name": "joker-chat-http-rest-ms",
+  "version": "1.0.0",
+  "description": "Chat Http server",
+  "main": "app.js",
+  "scripts": {
+    "start": "node ./bin/www",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chat",
+    "http"
+  ],
+  "author": "Gurbaj Singh",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.5.5",
+    "cassandra-driver": "^4.1.0",
+    "celebrate": "^10.0.0",
+    "confidence": "^4.0.2",
+    "express": "^4.16.3",
+    "helmet": "^3.18.0",
+    "ioredis": "^4.10.0",
+    "morgan": "^1.9.1",
+    "serve-favicon": "^2.5.0",
+    "winston": "^2.4.0"
+  }
+}
