@@ -14,6 +14,7 @@
   "author": "Gurbaj Singh",
   "license": "ISC",
   "dependencies": {
+    "accesscontrol": "^2.2.1",
     "bluebird": "^3.5.5",
     "cassandra-driver": "^4.1.0",
     "celebrate": "^10.0.0",
@@ -21,6 +22,7 @@
     "express": "^4.16.3",
     "helmet": "^3.18.0",
     "ioredis": "^4.10.0",
+    "jsonwebtoken": "^8.5.1",
     "morgan": "^1.9.1",
     "serve-favicon": "^2.5.0",
     "winston": "^2.4.0"

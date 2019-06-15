@@ -1,4 +1,4 @@
-const monogdb       = require('../../bootstrap/mongo').db
+'use strict'
 
 const collections   = {
     customers       : 'customers',
@@ -7,4 +7,4 @@ const collections   = {
     serviceprovidermqtts: 'serviceprovidermqtts'
 }
 
-module.exports      = {monogdb, collections}
+module.exports      = {mongoDb: global.mongoDb, collections}

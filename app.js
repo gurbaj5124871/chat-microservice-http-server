@@ -39,8 +39,17 @@ if(process.env.NODE_ENV === 'prod') {
     app.use(express.static(path.join(__dirname, 'public')));
     app.get('/', (req, res) => res.render('index', {title: 'Joker'}))
 }
-app.get('/moniter', nodeStats)
 
+(async () => {
+    // Bootstraping dbs
+    await require('./bootstrap/mongo').connectMongo()
+    await require('./bootstrap/redis')
+    await new Promise((res, rej) => {require('./bootstrap/cassandra').connect(async err => {if (err) {rej(err)} else {res()}})})
+    // Establishing intercommunication between microservices
+    await require('./src/ms-inter-comm')
+})();
+
+app.get('/moniter', nodeStats)
 // Registering Modules / Routes
 require('./src/modules')(app)
 
@@ -51,15 +60,6 @@ app.use(function (req, res, next) {
     next(err);
 });
 app.use(errify.errorhandlerMiddleware);
-
-// Bootstraping
-(async () => {
-    await require('./bootstrap/mongo').connectMongo()
-    await require('./bootstrap/redis')
-    await new Promise((res, rej) => {require('./bootstrap/cassandra').connect(async err => {if (err) {rej(err)} else {res()}})})
-    //await require('./src/mqtt')
-    await require('./src/ms-inter-comm')
-})();
 
 process.on('uncaughtException', err => {
     logger.error({message: err.message, name: err.name, stack: err.stack});

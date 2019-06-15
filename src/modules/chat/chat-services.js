@@ -55,21 +55,32 @@ const createConversationBetweenTwoUsers = async (requestedUser, otherUserId) => 
     }
 }
 
-const getConversationsBlockStatus = async conversations => {
+const getConversationsBlockStatus   = async conversations => {
     const query     = `SELECT conversation_id, is_blocked from conversations WHERE conversation_id = ? AND user_id = ?`;
-    const requests  = conversations.map(conversation => {
-        const params = [conversation.conversation_id, conversation.other_user_id];
-        return cassandra.execute(query, params, {prepare: true});
-    });
-    const results   = await Promise.all(requests);
+    const requests  = conversations.reduce((req, conversation) => {
+        if(conversation.other_user_id) 
+            req.push(cassandra.execute(query, [conversation.conversation_id, conversation.other_user_id], {prepare: true}));
+        return req
+    }, []);
+    const results   = requests.length ? await Promise.all(requests) : []
     const conversationBlocked = new Map();
     results.forEach(result => conversationBlocked.set(result.rows[0].conversation_id.toString(), result.rows[0].blocked));
     return conversationBlocked;
 }
 
+const getUnreadCount            = async (userId, conversationId) => {
+    const query     = `SELECT conversation_id, unread FROM unread_count WHERE conversation_id = ? AND user_id = ?`;
+    const count     = await cassandra.execute(query, [conversationId, userId], {prepare: true});
+    return count.rowLength ? parseInt(count.rows[0].unread) : 0;
+}
+
+const getUnreadCounts           = (userId, conversationIds) => Promise.all(conversationIds.map(id => getUnreadCount(userId, id)))
+
 module.exports                  = {
     createDefaultChannelForSP,
     getConversationBetweenTwoUsers,
     createConversationBetweenTwoUsers,
-    getConversationsBlockStatus
+    getConversationsBlockStatus,
+    getUnreadCount,
+    getUnreadCounts
 }

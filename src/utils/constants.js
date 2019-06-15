@@ -30,7 +30,10 @@ module.exports          = Object.freeze({
         businessTypes   : 'businessTypes',
         businessSubTypes: 'businessSubTypes',
         allServiceProviders: 'allServiceProviders',
-        allCustomers    : 'allCustomers'
+        allCustomers    : 'allCustomers',
+
+        conversations   : 'conversations',
+        groupChat       : 'groupChat'
     },
     
     conversationTypes   : {
