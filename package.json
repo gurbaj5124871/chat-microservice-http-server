@@ -17,7 +17,7 @@
     "accesscontrol": "^2.2.1",
     "bluebird": "^3.5.5",
     "cassandra-driver": "^4.1.0",
-    "celebrate": "^10.0.0",
+    "celebrate": "^10.0.1",
     "confidence": "^4.0.2",
     "express": "^4.16.3",
     "helmet": "^3.18.0",

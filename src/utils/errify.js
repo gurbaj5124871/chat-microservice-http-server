@@ -3,15 +3,18 @@ const logger                = require('./logger'),
     {isCelebrate}           = require('celebrate');
 
 const errorhandlerMiddleware= (err, req, res, next) => {
-    logger.error(err)
     if(isCelebrate(err)) {
-        err = createError(err.name, err.details[0] ? err.details[0].message : errMsg[1001], 500, '1001')
+        logger.error(err.joi)
+        err = createError(err.joi.name, err.joi.details[0] ? err.joi.details[0].message : errMsg[1001], 500, '1001')
         delete err.isErrifyied
-    } else if(err.isErrifyied === true)
-    delete err.isErrifyied
-    else {
-        err = createError(err, err.name, err.statusCode, err.errCode)
-        delete err.isErrifyied
+    } else {
+        logger.error(err)
+        if(err.isErrifyied === true)
+            delete err.isErrifyied
+        else {
+            err = createError(err, err.name, err.statusCode, err.errCode)
+            delete err.isErrifyied
+        }
     }
     res.status(err.statusCode || 500).send({error: err})
 }

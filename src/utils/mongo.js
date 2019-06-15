@@ -7,4 +7,4 @@ const collections   = {
     serviceprovidermqtts: 'serviceprovidermqtts'
 }
 
-module.exports      = {mongoDb: global.mongoDb, collections}
+module.exports      = collections

@@ -1,7 +1,7 @@
 const cassandra             = require('../../../bootstrap/cassandra').client,
     cassandraDriver         = require('cassandra-driver'),
     {redis, redisKeys}      = require('../../utils/redis'),
-    {mongoDb, collections}  = require('../../utils/mongo'),
+    mongoCollections        = require('../../utils/mongo'),
     constants               = require('../../utils/constants'),
     logger                  = require('../../utils/logger'), 
     universalFunc           = require('../../utils/universal-functions'),
@@ -21,7 +21,7 @@ const getCustomersBasicDetailsWithoutCache = async (customerIds=[]) => {
     if(customerIds.length)  {
         const criteria      = {_id: {$in: customerIds.map(id => universalFunc.mongoUUID(id))}}
         const projections   = {firstName: 1, lastName: 1, imageUrl: 1}
-        const customers     = await mongoDb.collection(collections.customers).find(criteria, projections).toArray()
+        const customers     = await mongodb.collection(mongoCollections.customers).find(criteria, projections).toArray()
         for(let customer of customers)
             result.set(customer._id.toString(), Object.assign(customer, {name: `${customer.firstName} ${customer.lastName}`, userType: constants.userRoles.customer}))
     }
@@ -32,7 +32,7 @@ const getServiceProvidersBasicDetailsWithoutCache = async (serviceProviderIds=[]
     const result            = new Map();
     if(serviceProviderIds.length) {
         const criteria      = {_id: {$in: serviceProviderIds.map(id => universalFunc.mongoUUID(id))}}
-        const serviceProviders  = await mongoDb.collection(collections.serviceproviders).find(criteria, {name: 1, imageUrl: 1}).toArray()
+        const serviceProviders  = await mongodb.collection(mongoCollections.serviceproviders).find(criteria, {name: 1, imageUrl: 1}).toArray()
         for(let serviceProvider of serviceProviders)
             result.set(serviceProvider._id.toString(), Object.assign(serviceProvider, {userType: constants.userRoles.serviceProvider}))
     }
@@ -65,6 +65,14 @@ const getUsersBasicDetailsFromConversations  = async conversations => {
     return response
 }
 
+const paginateConversations = (conversations, limit, pageState) => {
+    const result    = {conversations};
+    if (conversations.length < limit)
+        result.next = 'false';
+    else result.next = `?limit=${limit}&page_state=${pageState}`;
+    return result;
+}
+
 /**************************** PERMISSIONS and VALIDITY ***********************************/
 
 const getUserConversationsPermission    = (requestUser, userId) => {
@@ -79,7 +87,7 @@ module.exports          = {
     getCustomersBasicDetailsWithoutCache,
     getServiceProvidersBasicDetailsWithoutCache,
     getUsersBasicDetailsFromConversations,
-
+    paginateConversations,
 
     // Permissions and Valadities
     getUserConversationsPermission

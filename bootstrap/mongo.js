@@ -8,7 +8,7 @@ const connectMongo  = async () => {
     const mongoURI  = mongoConfig.url, dbName = mongoConfig.db;
     const mongo     = await mongoClient.connect(mongoURI)
     logger.info(`Captain America (Mongo DB) connected`)
-    global.mongoDb  = mongo.db(dbName)
+    global.mongodb  = mongo.db(dbName)
 }
 
 module.exports      = {connectMongo}

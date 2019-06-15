@@ -17,12 +17,14 @@ const getUserConversations      = async (req, res, next) => {
             for(let i=0; i<conversationResult.rowLength; i+=1) {
                 let conversation                = conversations[i]
                 conversation.unread_count       = unreadCount[i]
-                conversation.other_user_blocked = isUserBlocked.get(conversation.conversation_id.toString())
-                const {name: other_user_name, imageUrl: other_user_image_url} = otherUserDetails.get(conversation.conversation_id.toString())
-                conversation    = Object.assign(conversation, {other_user_name, other_user_image_url})
+                conversation.other_user_blocked = isUserBlocked.get(conversation.conversation_id.toString()) || null
+                if(conversation.other_user_id)  {
+                    const {name: other_user_name, imageUrl: other_user_image_url} = otherUserDetails.get(conversation.conversation_id.toString())
+                    conversation    = Object.assign(conversation, {other_user_name, other_user_image_url})
+                } else conversation    = Object.assign(conversation, {other_user_name: null, other_user_image_url: null})
             }
         }
-        return res.send({conversations})
+        return res.send(userServices.paginateConversations(conversations, limit, conversationResult.pageState))
     } catch (err) {
         next(err)
     }

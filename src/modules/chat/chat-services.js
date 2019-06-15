@@ -1,6 +1,6 @@
 const cassandra                 = require('../../../bootstrap/cassandra').client,
     cassandraDriver             = require('cassandra-driver'),
-    {monogdb, collections}      = require('../../utils/mongo'),
+    mongoCollections            = require('../../utils/mongo'),
     constants                   = require('../../utils/constants'),
     logger                      = require('../../utils/logger'),
     errify                      = require('../../utils/errify'),
@@ -37,8 +37,8 @@ const getConversationBetweenTwoUsers= (userId, otherUserId) => {
 const createConversationBetweenTwoUsers = async (requestedUser, otherUserId) => {
     const userId    = requestedUser.userId, userType = requestedUser.role;
     const otherUserType = userType === constants.userRoles.customer ? constants.userRoles.serviceProvider : constants.userRoles.customer;
-    const collection= otherUserType === constants.userRoles.customer ? collections.customers : collections.serviceproviders;
-    const otherUser = await monogdb.collection(collection).findOne({_id: otherUserId}, {_id: 1});
+    const collection= otherUserType === constants.userRoles.customer ? mongoCollections.customers : mongoCollections.serviceproviders;
+    const otherUser = await mongodb.collection(collection).findOne({_id: otherUserId}, {_id: 1});
     if(!otherUser)
         throw errify.notFound(errMsg['1017'], 1017)
     const conversationId    = cassandraDriver.types.TimeUuid.now(), conversationType = constants.conversationTypes.single;
