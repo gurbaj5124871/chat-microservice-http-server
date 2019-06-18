@@ -18,8 +18,10 @@ const redisKeys             = Object.freeze({
     customerPhoneVerification: phoneNumber => `customerPhoneVerification:${phoneNumber}`,
     
     // user basic details, expire it after one month or update on user update
-    user                    : userId => `user:${userId}`
-    
+    user                    : userId => `user:${userId}`,
+
+    // key value storing service provider default channel id
+    spDefaultChannel        : serviceProviderId => `spDefaultChannel:${serviceProviderId}`
 })
 
 module.exports              = {

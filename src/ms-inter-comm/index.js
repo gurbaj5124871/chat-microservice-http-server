@@ -2,7 +2,7 @@ const {redis}       = require('../utils/redis'),
     redisSub        = require('ioredis'),
     channels        = require('./channels'),
     chatServices    = require('../modules/chat/chat-services'),
-    config          = require('../../app-config'),
+    config          = require('../../config'),
     logger          = require('../utils/logger');
 
 const sub           = new redisSub(config.get('/redis'))

@@ -30,7 +30,36 @@ const getUserConversations      = async (req, res, next) => {
     }
 }
 
+const followServiceProvider     = async (req, res, next) => {
+    try {
+        const customerId        = req.user.userId, serviceProviderId = req.body.serviceProviderId;
+        const serviceProvider   = (await userServices.getServiceProvidersBasicDetailsWithoutCache([serviceProviderId])).get(serviceProviderId)
+        if(serviceProvider === undefined)
+            throw errify.badRequest(errMsg['1017'], 1017)
+        const followHistory     = await userServices.getCustomerServiceProviderFollowHistory(customerId, serviceProviderId)
+        if(followHistory.follow === true)
+            throw errify.badRequest(errMsg['2001'], 2001)
+        const {mqttTopics}      = await userServices.followServiceProvider(customerId, serviceProviderId, followHistory)
+        res.send({mqttTopics})
+        // send push notification to sp regarding following
+        
+    } catch (err) {
+        next(err)
+    }
+}
+
+const unfollowServiceProvider   = async (req, res, next) => {
+    try {
+        const customerId        = req.user.userId, serviceProviderId = req.body.serviceProviderId;
+        const {mqttTopics}      = await userServices.unfollowServiceProvider(customerId, serviceProviderId)
+        return res.send({mqttTopics})
+    } catch (err) {
+        next(err)
+    }
+}
 
 module.exports          = {
-    getUserConversations
+    getUserConversations,
+    followServiceProvider,
+    unfollowServiceProvider
 }

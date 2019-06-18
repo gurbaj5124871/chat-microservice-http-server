@@ -1,8 +1,10 @@
 const cassandra                 = require('../../../bootstrap/cassandra').client,
     cassandraDriver             = require('cassandra-driver'),
+    {redis, redisKeys}          = require('../../utils/redis'),
     mongoCollections            = require('../../utils/mongo'),
     constants                   = require('../../utils/constants'),
     logger                      = require('../../utils/logger'),
+    universalFunc               = require('../../utils/universal-functions'),
     errify                      = require('../../utils/errify'),
     errMsg                      = require('../../utils/error-messages');
 
@@ -21,6 +23,7 @@ const createDefaultChannelForSP = async (serviceProviderId, serviceProvider) => 
                 conversationId, constants.defalutMessages.spAdminVerified(serviceProvider.name), serviceProviderId, constants.messageType.notificaiton
             ]
             await cassandra.execute(spDefaultChannel, params, {prepare: true})
+            await redis.set(redisKeys.spDefaultChannel(serviceProviderId), conversationId.toString())
         }
     } catch (err) {
         console.log(err)
@@ -28,9 +31,26 @@ const createDefaultChannelForSP = async (serviceProviderId, serviceProvider) => 
     }
 }
 
+const getServiceProviderDefaultChannelId = async serviceProviderId => {
+    let channelId   = await redis.get(redisKeys.spDefaultChannel(serviceProviderId))
+    if(channelId === null) {
+        const query = `SELECT conversation_id FROM conversations_by_time WHERE user_id = ? AND conversation_type = ?`
+        const result= await cassandra.execute(query, [serviceProviderId, constants.conversationTypes.channel], {prepare: true})
+        channelId   = result.rows[0].conversation_id.toString()
+        await redis.set(redisKeys.spDefaultChannel(serviceProviderId), channelId)
+    }
+    return channelId
+}
+
+const getServiceProviderDefaultChannel  = async serviceProviderId => {
+    const query     = `SELECT * FROM conversations_by_time WHERE user_id = ? AND conversation_type = ?`;
+    const channelRes= await cassandra.execute(query, [serviceProviderId, constants.conversationTypes.channel], {prepare: true})
+    return channelRes.rows[0]
+}
+
 const getConversationBetweenTwoUsers= (userId, otherUserId) => {
-    const query     = `SELECT * FROM conversation_by_pairs WHERE user_id = ? AND other_user_id = ?`;
-    const params    = [userId, otherUserId];
+    const query     = `SELECT * FROM conversation_by_pairs WHERE user_id = ? AND other_user_id = ? AND conversation_type= ?`;
+    const params    = [userId, otherUserId, constants.conversationTypes.single];
     return cassandra.execute(query, params, {prepare: true});
 }
 
@@ -38,14 +58,14 @@ const createConversationBetweenTwoUsers = async (requestedUser, otherUserId) => 
     const userId    = requestedUser.userId, userType = requestedUser.role;
     const otherUserType = userType === constants.userRoles.customer ? constants.userRoles.serviceProvider : constants.userRoles.customer;
     const collection= otherUserType === constants.userRoles.customer ? mongoCollections.customers : mongoCollections.serviceproviders;
-    const otherUser = await mongodb.collection(collection).findOne({_id: otherUserId}, {_id: 1});
+    const otherUser = await mongodb.collection(collection).findOne({_id: universalFunc.mongoUUID(otherUserId)}, {_id: 1});
     if(!otherUser)
         throw errify.notFound(errMsg['1017'], 1017)
     const conversationId    = cassandraDriver.types.TimeUuid.now(), conversationType = constants.conversationTypes.single;
     const query     = `INSERT INTO conversations (conversation_id, user_id, other_user_id, conversation_type, conversation_user_type) VALUES (?, ?, ?, ?, ?)`;
     const queries   = [
         {query, params: [conversationId, userId, otherUserId, conversationType, userType]},
-        {query, params: [conversationId, userId, otherUserId, conversationType, otherUserType]}
+        {query, params: [conversationId, otherUserId, userId, conversationType, otherUserType]}
     ]
     await cassandra.batch(queries, {prepare: true});
     return {
@@ -78,6 +98,8 @@ const getUnreadCounts           = (userId, conversationIds) => Promise.all(conve
 
 module.exports                  = {
     createDefaultChannelForSP,
+    getServiceProviderDefaultChannelId,
+    getServiceProviderDefaultChannel,
     getConversationBetweenTwoUsers,
     createConversationBetweenTwoUsers,
     getConversationsBlockStatus,

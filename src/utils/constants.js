@@ -31,9 +31,10 @@ module.exports          = Object.freeze({
         businessSubTypes: 'businessSubTypes',
         allServiceProviders: 'allServiceProviders',
         allCustomers    : 'allCustomers',
-
+        follow          : 'follow',
+        getFollowersList: 'getFollowersList',
         conversations   : 'conversations',
-        groupChat       : 'groupChat'
+        groupChat       : 'groupChat',
     },
     
     conversationTypes   : {

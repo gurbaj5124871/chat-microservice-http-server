@@ -1,6 +1,6 @@
 'use strict'
 
-const config            = require('../../app-config');
+const config            = require('../../config');
 const getMsTopic        = msName => `microservice/${msName}`;
 
 module.exports          = Object.freeze({

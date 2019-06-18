@@ -22,6 +22,7 @@ accessControl
     ])
     .readOwn(resource.customer, ['*', '!password', '!emailVerificationToken', '!phoneVerificationToken', '!lastActivityAt'])
     .updateOwn(resource.customer)
+    .create(resource.follow)
 
 // Service Provider Specific
 accessControl

@@ -3,8 +3,9 @@
 const collections   = {
     customers       : 'customers',
     serviceproviders: 'serviceproviders',
-    customermqtts   : 'customermqtts',
-    serviceprovidermqtts: 'serviceprovidermqtts'
+    followings      : 'followings',
+
+    
 }
 
 module.exports      = collections

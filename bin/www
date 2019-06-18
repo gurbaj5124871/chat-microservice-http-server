@@ -3,7 +3,7 @@
 const app   = require('../app'),
     debug   = require('debug')('joker:server'),
     http    = require('http'),
-    config  = require('../app-config'),
+    config  = require('../config'),
     logger  = require('../src/utils/logger');
 
 /**

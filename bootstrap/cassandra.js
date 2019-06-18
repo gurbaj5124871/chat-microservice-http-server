@@ -2,7 +2,7 @@
 
 const cassandra         = require('cassandra-driver'),
     logger              = require('../src/utils/logger'),
-    cassandraConfig     = require('../app-config').get('/cassandra');
+    cassandraConfig     = require('../config').get('/cassandra');
 
 const authProvider      = cassandraConfig.user !== undefined ?
     new cassandra.auth.PlainTextAuthProvider(cassandraConfig.user, cassandraConfig.password) : undefined;

@@ -1,7 +1,7 @@
 const Promise           = require('bluebird'),
     redis               = require('ioredis'),
     logger              = require('../src/utils/logger'),
-    config              = require('../app-config');
+    config              = require('../config');
 
 redis.Promise           = Promise
 

@@ -12,6 +12,20 @@ const getUserConversations      = celebrate({
     })
 })
 
+const followServiceProvider     = celebrate({
+    body                        : Joi.object().keys({
+        serviceProviderId       : Joi.string().required().regex(mongoIdRegex)
+    })
+})
+
+const unfollowServiceProvider   = celebrate({
+    body                        : Joi.object().keys({
+        serviceProviderId       : Joi.string().required().regex(mongoIdRegex)
+    })
+})
+
 module.exports                  = {
-    getUserConversations
+    getUserConversations,
+    followServiceProvider,
+    unfollowServiceProvider
 }

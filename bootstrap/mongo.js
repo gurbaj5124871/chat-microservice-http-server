@@ -1,7 +1,7 @@
 'use strict'
 
 const mongoClient   = require('mongodb').MongoClient,
-      mongoConfig   = require('../app-config').get('/mongodb'),
+      mongoConfig   = require('../config').get('/mongodb'),
       logger        = require('../src/utils/logger');
 
 const connectMongo  = async () => {

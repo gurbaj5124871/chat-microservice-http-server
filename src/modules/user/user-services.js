@@ -2,6 +2,7 @@ const cassandra             = require('../../../bootstrap/cassandra').client,
     cassandraDriver         = require('cassandra-driver'),
     {redis, redisKeys}      = require('../../utils/redis'),
     mongoCollections        = require('../../utils/mongo'),
+    chatServices            = require('../chat/chat-services'),
     constants               = require('../../utils/constants'),
     logger                  = require('../../utils/logger'), 
     universalFunc           = require('../../utils/universal-functions'),
@@ -73,6 +74,79 @@ const paginateConversations = (conversations, limit, pageState) => {
     return result;
 }
 
+const getCustomerServiceProviderFollowHistory = async (customerId, serviceProviderId) => {
+    customerId = universalFunc.mongoUUID(customerId); serviceProviderId = universalFunc.mongoUUID(serviceProviderId);
+    const follow    = await mongodb.collection(mongoCollections.followings).findOne({customerId, serviceProviderId}, {_id: 1, isDeleted: 1})
+    return follow !== null ? (follow.isDeleted === false ? {follow: true, followId: follow._id} : {follow: false, followId: follow._id}) : {follow: false, followId: null}
+}
+
+const followServiceProvider     = async (customerId, serviceProviderId, followHistory) => {
+    let response                = {mqttTopics: []}
+    customerId = universalFunc.mongoUUID(customerId); serviceProviderId = universalFunc.mongoUUID(serviceProviderId);
+    if(followHistory.followId === null) {
+        const spChannel         = await chatServices.getServiceProviderDefaultChannel(serviceProviderId.toString())
+        const channelId         = spChannel.conversation_id.toString()
+        const followDocument    = {
+            customerId, serviceProviderId, mqttTopics: [`${serviceProviderId}-${channelId}`],
+            createdAt: new Date(), followedAt: new Date(), isDeleted: false
+        }
+        await mongodb.collection(mongoCollections.followings).insertOne(followDocument)
+        // create channel conversation for customer
+        const cpChannelQuery    = `INSERT INTO conversations (conversation_id, user_id, other_user_id, conversation_type,
+            conversation_user_type, last_message_id, last_message_content, last_message_sender_id, last_message_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const params            = [
+            spChannel.conversation_id, customerId.toString(), serviceProviderId.toString(), constants.conversationTypes.channel, constants.userRoles.customer,
+            spChannel.last_message_id, spChannel.last_message_content, spChannel.last_message_sender_id, spChannel.last_message_type
+        ]
+        await cassandra.execute(cpChannelQuery, params, {prepare: true})
+        response                = {mqttTopics: followDocument.mqttTopics}
+    } else {
+        await blockUnblockAllConversations(false, customerId, serviceProviderId)
+        const criteria          = {_id: followHistory.followId, customerId, serviceProviderId}
+        await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: false, followedAt: new Date()}})
+        response                = await mongodb.collection(mongoCollections.followings).findOne(criteria, {mqttTopics: 1})
+    }
+    await Promise.all([
+        mongodb.collection(mongoCollections.customers).updateOne({_id: customerId}, {$inc: {noOfBusinessesFollowed: 1}}),
+        mongodb.collection(mongoCollections.serviceproviders).updateOne({_id: serviceProviderId}, {$inc: {noOfCustomersFollowing: 1}})
+    ])
+    return response
+}
+
+const unfollowServiceProvider   = async (customerId, serviceProviderId) => {
+    customerId = universalFunc.mongoUUID(customerId); serviceProviderId = universalFunc.mongoUUID(serviceProviderId);
+    const criteria              = {customerId, serviceProviderId, isDeleted: false}
+    const follow                = await mongodb.collection(mongoCollections.followings).findOne(criteria, {mqttTopics: 1})
+    if(follow !== null)         {
+        // block all conversations
+        await blockUnblockAllConversations(true, customerId, serviceProviderId)
+        await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: true}})
+        await Promise.all([
+            mongodb.collection(mongoCollections.customers).updateOne({_id: customerId}, {$inc: {noOfBusinessesFollowed: -1}}),
+            mongodb.collection(mongoCollections.serviceproviders).updateOne({_id: serviceProviderId}, {$inc: {noOfCustomersFollowing: -1}})
+        ])
+        return {mqttTopics: follow.mqttTopics}
+    } else return {mqttTopics: []}
+}
+
+async function blockUnblockAllConversations (blockConversation, customerId, serviceProviderId) {
+    customerId = customerId.toString(); serviceProviderId = serviceProviderId.toString()
+    const conversationQuery     = `SELECT conversation_id, conversation_type FROM conversation_by_pairs WHERE user_id = ? AND other_user_id = ?`
+    const [cpConvo, spConvo]    = await Promise.all([
+        cassandra.execute(conversationQuery, [customerId, serviceProviderId], {prepare: true}),
+        cassandra.execute(conversationQuery, [serviceProviderId, customerId], {prepare: true})
+    ])
+    if(cpConvo.rowLength)       {
+        // const conversationIds   = cpConvo.rows.map(convo => convo.conversation_id)
+        const unblockQuery      = `UPDATE conversations SET is_blocked = ? WHERE conversation_id = ? AND user_id = ? AND conversation_type = ?`;
+        const batch             = cpConvo.rows.map(convo => {return {query: unblockQuery, params: [blockConversation, convo.conversation_id, customerId, convo.conversation_type]}})
+        if(spConvo.rowLength)
+            batch.push(...spConvo.rows.map(convo => {return {query: unblockQuery, params: [blockConversation, convo.conversation_id, serviceProviderId, convo.conversation_type]}}))
+        await cassandra.batch(batch, {prepare: true})
+    } 
+}
+
 /**************************** PERMISSIONS and VALIDITY ***********************************/
 
 const getUserConversationsPermission    = (requestUser, userId) => {
@@ -88,6 +162,10 @@ module.exports          = {
     getServiceProvidersBasicDetailsWithoutCache,
     getUsersBasicDetailsFromConversations,
     paginateConversations,
+    getCustomerServiceProviderFollowHistory,
+    followServiceProvider,
+    unfollowServiceProvider,
+
 
     // Permissions and Valadities
     getUserConversationsPermission

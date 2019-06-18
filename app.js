@@ -7,7 +7,7 @@ const   express                 = require('express'),
         helmet                  = require('helmet'),
         nodeStats               = require('./src/utils/node-stats');
         favicon                 = require('serve-favicon'),
-        config                  = require('./app-config');
+        config                  = require('./config');
 
 const   app                     = express();
 
