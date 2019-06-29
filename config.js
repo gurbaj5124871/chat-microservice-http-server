@@ -12,7 +12,7 @@ const config            = {
     port                : {
         $filter         : 'env',
         dev             : 3002,
-        test            : 3001,
+        test            : 3002,
         prod            : process.env.PORT || 3003,
         $default        : 3002
     },
