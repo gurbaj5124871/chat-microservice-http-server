@@ -5,5 +5,6 @@ module.exports  = Object.freeze({
 
   // chat microservice error codes
   '2000'        : 'Can\'t start a conversation with self',
-  '2001'        : 'You are already following'
+  '2001'        : 'You are already following',
+  '2002'        : 'Conversation Not Found'
 })

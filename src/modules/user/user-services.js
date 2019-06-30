@@ -40,11 +40,51 @@ const getServiceProvidersBasicDetailsWithoutCache = async (serviceProviderIds=[]
     return result
 }
 
+const getCustomersBasicDetailsByIds = async (customerIds = []) => {
+    const usersBasicDetails     = await redis.mget(customerIds.map(id => redisKeys.user(id))), unCachedUsers = [];
+    const response              = new Map()
+    for(let i=0; i<customerIds.length; i+=1) {
+        if(usersBasicDetails[i] === null)
+            unCachedUsers.push(customerIds[i])
+        else response.set(customerIds[i], JSON.parse(usersBasicDetails[i]))
+    }
+    if(unCachedUsers.length) {
+        const result            = await getCustomersBasicDetailsWithoutCache(unCachedUsers);
+        const pipeline          = redis.pipeline()
+        result.forEach((userId, basicDetails) => {
+            pipeline.setex(redisKeys.user(userId), universalFunc.convertDaysToSeconds(30), JSON.stringify(basicDetails))
+            response.set(userId, basicDetails)
+        })
+        await pipeline.exec()
+    }
+    return response
+}
+
+const getServiceProvidersBasicDetailsByIds = async (serviceProviderIds = []) => {
+    const usersBasicDetails     = await redis.mget(serviceProviderIds.map(id => redisKeys.user(id))), unCachedUsers = [];
+    const response              = new Map()
+    for(let i=0; i<serviceProviderIds.length; i+=1) {
+        if(usersBasicDetails[i] === null)
+            unCachedUsers.push(serviceProviderIds[i])
+        else response.set(serviceProviderIds[i], JSON.parse(usersBasicDetails[i]))
+    }
+    if(unCachedUsers.length) {
+        const result            = await getServiceProvidersBasicDetailsWithoutCache(unCachedUsers);
+        const pipeline          = redis.pipeline()
+        result.forEach((userId, basicDetails) => {
+            pipeline.setex(redisKeys.user(userId), universalFunc.convertDaysToSeconds(30), JSON.stringify(basicDetails))
+            response.set(userId, basicDetails)
+        })
+        await pipeline.exec()
+    }
+    return response
+}
+
 const getUsersBasicDetailsFromConversations  = async conversations => {
     const conversationUserType  = conversations[0].conversation_user_type, unCachedUsers = [];
     const userIds               = conversations.map(convo => {
         if(convo.other_user_id)
-            return convo.other_user_id
+            return redisKeys.user(convo.other_user_id)
     })
     const usersBasicDetails     = await redis.mget(userIds)
     const response              = new Map()
@@ -59,7 +99,7 @@ const getUsersBasicDetailsFromConversations  = async conversations => {
         const pipeline          = redis.pipeline()
         result.forEach((userId, basicDetails) => {
             pipeline.setex(redisKeys.user(userId), universalFunc.convertDaysToSeconds(30), JSON.stringify(basicDetails))
-            result.set(userId, basicDetails)
+            response.set(userId, basicDetails)
         })
         await pipeline.exec()
     }
@@ -160,6 +200,8 @@ module.exports          = {
     getUserConversations,
     getCustomersBasicDetailsWithoutCache,
     getServiceProvidersBasicDetailsWithoutCache,
+    getCustomersBasicDetailsByIds,
+    getServiceProvidersBasicDetailsByIds,
     getUsersBasicDetailsFromConversations,
     paginateConversations,
     getCustomerServiceProviderFollowHistory,

@@ -75,6 +75,12 @@ const createConversationBetweenTwoUsers = async (requestedUser, otherUserId) => 
     }
 }
 
+const getConversationById           = (conversationId, userId) => {
+    const query     = `SELECT * FROM conversations WHERE conversation_id = ? AND user_id = ?`
+    const params    = [conversationId, userId]
+    return cassandra.execute(query, params, {prepare: true})
+}
+
 const getConversationsBlockStatus   = async conversations => {
     const query     = `SELECT conversation_id, is_blocked from conversations WHERE conversation_id = ? AND user_id = ?`;
     const requests  = conversations.reduce((req, conversation) => {
@@ -96,13 +102,55 @@ const getUnreadCount            = async (userId, conversationId) => {
 
 const getUnreadCounts           = (userId, conversationIds) => Promise.all(conversationIds.map(id => getUnreadCount(userId, id)))
 
+const getMessages               = (conversationId, fetchSize=20, pageState, lastMessageId) => {
+    let query       = `SELECT message_id, toTimestamp(message_id) as message_time, content, message_type, sender_id, sender_type, is_deleted FROM message WHERE conversation_id = ?`
+    const params    = [conversationId]
+    if(lastMessageId){
+        query       += ` AND message_id < ?`
+        params.push(lastMessageId)
+    }
+    return cassandra.execute(query, params, {fetchSize, pageState, prepare: true})
+}
+
+const getMessagesAcknowlegements= async (conversationId, messageIds) => {
+    const query     = `SELECT message_id, COUNT(is_delivered) as delivered_count, COUNT(is_seen) as seen_count
+        FROM message_acknowledgement_status WHERE conversation_id = ? AND message_id IN ? GROUP BY message_id`;
+    const result    = await cassandra.execute(query, [conversationId, messageIds], {prepare: true})
+    return result.rows.reduce((map, row) => {map.set(row.message_id.toString(), row); return map;}, new Map())
+}
+
+const changeBlockStatusByConversationId = async (conversationId, userId, block) => {
+    const convoQuery= `SELECT conversation_type, other_user_id, is_blocked FROM conversations WHERE conversation_id =? AND user_id = ?`
+    const conversationResult    = await cassandra.execute(convoQuery, [conversationId, userId], {prepare: true})
+    if(conversationResult.rowLength && conversationResult.rows[0].conversation_type === constants.conversationTypes.single) {
+        const {other_user_id: otherUserId} = conversationResult.rows[0]
+        const blockUpdateQuery  = `UPDATE conversations SET is_blocked = ? WHERE conversation_id = ? AND user_id = ? AND conversation_type = ?`
+        const params            = [block, conversationId, otherUserId, constants.conversationTypes.single]
+        await cassandra.execute(blockUpdateQuery, params, {prepare: true})
+    }
+}
+
+const clearUnreadCount          = async (conversationId, userId) => {
+    const currentUnreadCount    = await getUnreadCount(userId, conversationId)
+    if (currentUnreadCount !== 0) {
+        const query             = 'UPDATE unread_count SET unread = unread - ? WHERE conversation_id = ? AND user_id = ?'
+        const params            = [currentUnreadCount, conversationId, userId]
+        return cassandra.execute(query, params, {prepare: true})
+    }
+}
+
 module.exports                  = {
     createDefaultChannelForSP,
     getServiceProviderDefaultChannelId,
     getServiceProviderDefaultChannel,
     getConversationBetweenTwoUsers,
     createConversationBetweenTwoUsers,
+    getConversationById,
     getConversationsBlockStatus,
     getUnreadCount,
-    getUnreadCounts
+    getUnreadCounts,
+    getMessages,
+    getMessagesAcknowlegements,
+    changeBlockStatusByConversationId,
+    clearUnreadCount
 }
