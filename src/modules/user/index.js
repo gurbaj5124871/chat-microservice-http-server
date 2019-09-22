@@ -8,6 +8,8 @@ const express       = require('express'),
 
 router.get('/conversations', authentication.verifyToken, validator.getUserConversations, controller.getUserConversations)
 
+router.get('/conversationsCached', authentication.verifyToken, validator.getUserConversationsCached, controller.getUserConversationsCached)
+
 router.post('/customer/follow/serviceProvider', authentication.verifyToken, accessAllowed('create', resource.follow), validator.followServiceProvider, controller.followServiceProvider)
 
 router.post('/customer/unfollow/serviceProvider', authentication.verifyToken, accessAllowed('create', resource.follow), validator.unfollowServiceProvider, controller.unfollowServiceProvider)

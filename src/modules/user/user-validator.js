@@ -12,6 +12,13 @@ const getUserConversations      = celebrate({
     })
 })
 
+const getUserConversationsCached= celebrate({
+    query                       : Joi.object().keys({
+        limit                   : Joi.number().integer().default(10),
+        last_score              : Joi.number().integer()
+    })
+})
+
 const followServiceProvider     = celebrate({
     body                        : Joi.object().keys({
         serviceProviderId       : Joi.string().required().regex(mongoIdRegex)
@@ -26,6 +33,7 @@ const unfollowServiceProvider   = celebrate({
 
 module.exports                  = {
     getUserConversations,
+    getUserConversationsCached,
     followServiceProvider,
     unfollowServiceProvider
 }

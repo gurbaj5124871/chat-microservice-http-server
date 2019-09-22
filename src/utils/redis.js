@@ -21,7 +21,10 @@ const redisKeys             = Object.freeze({
     user                    : userId => `user:${userId}`,
 
     // key value storing service provider default channel id
-    spDefaultChannel        : serviceProviderId => `spDefaultChannel:${serviceProviderId}`
+    spDefaultChannel        : serviceProviderId => `spDefaultChannel:${serviceProviderId}`,
+
+    // Sorted Set storing User's conversations
+    userConversations       : userId => `userConversations:${userId}`
 })
 
 module.exports              = {

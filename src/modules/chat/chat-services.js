@@ -2,6 +2,7 @@ const cassandra                 = require('../../../bootstrap/cassandra').client
     cassandraDriver             = require('cassandra-driver'),
     {redis, redisKeys}          = require('../../utils/redis'),
     mongoCollections            = require('../../utils/mongo'),
+    userServices                = require('../user/user-services'),
     constants                   = require('../../utils/constants'),
     logger                      = require('../../utils/logger'),
     universalFunc               = require('../../utils/universal-functions'),
@@ -127,6 +128,7 @@ const changeBlockStatusByConversationId = async (conversationId, userId, block) 
         const blockUpdateQuery  = `UPDATE conversations SET is_blocked = ? WHERE conversation_id = ? AND user_id = ? AND conversation_type = ?`
         const params            = [block, conversationId, otherUserId, constants.conversationTypes.single]
         await cassandra.execute(blockUpdateQuery, params, {prepare: true})
+        await userServices.expireUserConversationsCached(userId)
     }
 }
 

@@ -12,9 +12,39 @@ const cassandra             = require('../../../bootstrap/cassandra').client,
 const getUserConversations  = (userId, fetchSize=10, pageState) => {
     const query             = `
         SELECT conversation_id, user_id, other_user_id, conversation_type, conversation_user_type, last_message_id, is_muted, 
-        toTimestamp(last_message_id) as last_message_time, last_message_content, last_message_sender_id, last_message_type, 
-        is_blocked, is_deleted, image_url FROM conversations_by_time WHERE user_id = ?`;
+        toTimestamp(last_message_id) as last_message_time, toUnixTimestamp(last_message_id) as last_message_unix_time,
+        last_message_content, last_message_sender_id, last_message_type, is_blocked, is_deleted, image_url 
+        FROM conversations_by_time WHERE user_id = ?`;
     return cassandra.execute(query, [userId], {prepare: true, fetchSize, pageState});
+}
+
+const getUserAllConversations = userId => {
+    const query             = `
+        SELECT conversation_id, user_id, other_user_id, conversation_type, conversation_user_type, last_message_id, is_muted, 
+        toTimestamp(last_message_id) as last_message_time, toUnixTimestamp(last_message_id) as last_message_unix_time, 
+        last_message_content, last_message_sender_id, last_message_type, is_blocked, is_deleted, image_url 
+        FROM conversations_by_time WHERE user_id = ?`;
+    return cassandra.execute(query, [userId], {prepare: true});
+}
+
+const getUserConversationsCached = async (userId, limit, lastScore = '+inf') => {
+    const key               = redisKeys.userConversations(userId)
+    if(await redis.exists(key) === 0) {
+        const userAllConvos = await getUserAllConversations(userId)
+        if(userAllConvos.rowLength === 0)
+            return [];
+        const zrangeArray = [];
+        userAllConvos.rows.forEach(convo => {
+            zrangeArray.push(convo.last_message_unix_time)
+            zrangeArray.push(JSON.stringify(convo))
+        })
+        await redis.zadd(key, zrangeArray);
+        // expiring in 1 day
+        await redis.expire(key, universalFunc.convertDaysToSeconds(1));
+    }
+    const startRange = '('+lastScore
+    const conversations = await redis.zrevrangebyscore(key, startRange, '-inf', 'limit', 0, limit)
+    return conversations.map(JSON.parse)
 }
 
 const getCustomersBasicDetailsWithoutCache = async (customerIds=[]) => {
@@ -114,11 +144,21 @@ const paginateConversations = (conversations, limit, pageState) => {
     return result;
 }
 
+const paginateConversationsCached = (conversations, limit, lastScore) => {
+    const result    = {conversations};
+    if (conversations.length < limit)
+        result.next = 'false';
+    else result.next = `?limit=${limit}&last_score=${lastScore}`;
+    return result;
+}
+
 const getCustomerServiceProviderFollowHistory = async (customerId, serviceProviderId) => {
     customerId = universalFunc.mongoUUID(customerId); serviceProviderId = universalFunc.mongoUUID(serviceProviderId);
     const follow    = await mongodb.collection(mongoCollections.followings).findOne({customerId, serviceProviderId}, {_id: 1, isDeleted: 1})
     return follow !== null ? (follow.isDeleted === false ? {follow: true, followId: follow._id} : {follow: false, followId: follow._id}) : {follow: false, followId: null}
 }
+
+const expireUserConversationsCached = userId => redis.del(redisKeys.userConversations(userId))
 
 const followServiceProvider     = async (customerId, serviceProviderId, followHistory) => {
     let response                = {mqttTopics: []}
@@ -140,9 +180,12 @@ const followServiceProvider     = async (customerId, serviceProviderId, followHi
             spChannel.last_message_id, spChannel.last_message_content, spChannel.last_message_sender_id, spChannel.last_message_type
         ]
         await cassandra.execute(cpChannelQuery, params, {prepare: true})
+        // expire customer's cached conversations conversations
+        await expireUserConversationsCached(customerId)
         response                = {mqttTopics: followDocument.mqttTopics}
     } else {
         await blockUnblockAllConversations(false, customerId, serviceProviderId)
+        await expireUserConversationsCached(customerId)
         const criteria          = {_id: followHistory.followId, customerId, serviceProviderId}
         await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: false, followedAt: new Date()}})
         response                = await mongodb.collection(mongoCollections.followings).findOne(criteria, {mqttTopics: 1})
@@ -161,6 +204,7 @@ const unfollowServiceProvider   = async (customerId, serviceProviderId) => {
     if(follow !== null)         {
         // block all conversations
         await blockUnblockAllConversations(true, customerId, serviceProviderId)
+        await expireUserConversationsCached(customerId)
         await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: true}})
         await Promise.all([
             mongodb.collection(mongoCollections.customers).updateOne({_id: customerId}, {$inc: {noOfBusinessesFollowed: -1}}),
@@ -178,7 +222,6 @@ async function blockUnblockAllConversations (blockConversation, customerId, serv
         cassandra.execute(conversationQuery, [serviceProviderId, customerId], {prepare: true})
     ])
     if(cpConvo.rowLength)       {
-        // const conversationIds   = cpConvo.rows.map(convo => convo.conversation_id)
         const unblockQuery      = `UPDATE conversations SET is_blocked = ? WHERE conversation_id = ? AND user_id = ? AND conversation_type = ?`;
         const batch             = cpConvo.rows.map(convo => {return {query: unblockQuery, params: [blockConversation, convo.conversation_id, customerId, convo.conversation_type]}})
         if(spConvo.rowLength)
@@ -198,13 +241,17 @@ const getUserConversationsPermission    = (requestUser, userId) => {
 
 module.exports          = {
     getUserConversations,
+    getUserAllConversations,
+    getUserConversationsCached,
     getCustomersBasicDetailsWithoutCache,
     getServiceProvidersBasicDetailsWithoutCache,
     getCustomersBasicDetailsByIds,
     getServiceProvidersBasicDetailsByIds,
     getUsersBasicDetailsFromConversations,
     paginateConversations,
+    paginateConversationsCached,
     getCustomerServiceProviderFollowHistory,
+    expireUserConversationsCached,
     followServiceProvider,
     unfollowServiceProvider,
 
