@@ -8,7 +8,8 @@ const express       = require('express'),
 
 router.get('/conversations', authentication.verifyToken, validator.getUserConversations, controller.getUserConversations)
 
-router.get('/conversationsCached', authentication.verifyToken, validator.getUserConversationsCached, controller.getUserConversationsCached)
+// solution to update the user's conversations to update in cache with messages recieving is not found yet. So commenting the api
+// router.get('/conversationsCached', authentication.verifyToken, validator.getUserConversationsCached, controller.getUserConversationsCached)
 
 router.post('/customer/follow/serviceProvider', authentication.verifyToken, accessAllowed('create', resource.follow), validator.followServiceProvider, controller.followServiceProvider)
 

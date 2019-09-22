@@ -27,25 +27,25 @@ const getUserAllConversations = userId => {
     return cassandra.execute(query, [userId], {prepare: true});
 }
 
-const getUserConversationsCached = async (userId, limit, lastScore = '+inf') => {
-    const key               = redisKeys.userConversations(userId)
-    if(await redis.exists(key) === 0) {
-        const userAllConvos = await getUserAllConversations(userId)
-        if(userAllConvos.rowLength === 0)
-            return [];
-        const zrangeArray = [];
-        userAllConvos.rows.forEach(convo => {
-            zrangeArray.push(convo.last_message_unix_time)
-            zrangeArray.push(JSON.stringify(convo))
-        })
-        await redis.zadd(key, zrangeArray);
-        // expiring in 1 day
-        await redis.expire(key, universalFunc.convertDaysToSeconds(1));
-    }
-    const startRange = '('+lastScore
-    const conversations = await redis.zrevrangebyscore(key, startRange, '-inf', 'limit', 0, limit)
-    return conversations.map(JSON.parse)
-}
+// const getUserConversationsCached = async (userId, limit, lastScore = '+inf') => {
+//     const key               = redisKeys.userConversations(userId)
+//     if(await redis.exists(key) === 0) {
+//         const userAllConvos = await getUserAllConversations(userId)
+//         if(userAllConvos.rowLength === 0)
+//             return [];
+//         const zrangeArray = [];
+//         userAllConvos.rows.forEach(convo => {
+//             zrangeArray.push(convo.last_message_unix_time)
+//             zrangeArray.push(JSON.stringify(convo))
+//         })
+//         await redis.zadd(key, zrangeArray);
+//         // expiring in 1 day
+//         await redis.expire(key, universalFunc.convertDaysToSeconds(1));
+//     }
+//     const startRange = '('+lastScore
+//     const conversations = await redis.zrevrangebyscore(key, startRange, '-inf', 'limit', 0, limit)
+//     return conversations.map(JSON.parse)
+// }
 
 const getCustomersBasicDetailsWithoutCache = async (customerIds=[]) => {
     const result            = new Map();
@@ -144,13 +144,13 @@ const paginateConversations = (conversations, limit, pageState) => {
     return result;
 }
 
-const paginateConversationsCached = (conversations, limit, lastScore) => {
-    const result    = {conversations};
-    if (conversations.length < limit)
-        result.next = 'false';
-    else result.next = `?limit=${limit}&last_score=${lastScore}`;
-    return result;
-}
+// const paginateConversationsCached = (conversations, limit, lastScore) => {
+//     const result    = {conversations};
+//     if (conversations.length < limit)
+//         result.next = 'false';
+//     else result.next = `?limit=${limit}&last_score=${lastScore}`;
+//     return result;
+// }
 
 const getCustomerServiceProviderFollowHistory = async (customerId, serviceProviderId) => {
     customerId = universalFunc.mongoUUID(customerId); serviceProviderId = universalFunc.mongoUUID(serviceProviderId);
@@ -158,7 +158,7 @@ const getCustomerServiceProviderFollowHistory = async (customerId, serviceProvid
     return follow !== null ? (follow.isDeleted === false ? {follow: true, followId: follow._id} : {follow: false, followId: follow._id}) : {follow: false, followId: null}
 }
 
-const expireUserConversationsCached = userId => redis.del(redisKeys.userConversations(userId))
+// const expireUserConversationsCached = userId => redis.del(redisKeys.userConversations(userId))
 
 const followServiceProvider     = async (customerId, serviceProviderId, followHistory) => {
     let response                = {mqttTopics: []}
@@ -180,12 +180,12 @@ const followServiceProvider     = async (customerId, serviceProviderId, followHi
             spChannel.last_message_id, spChannel.last_message_content, spChannel.last_message_sender_id, spChannel.last_message_type
         ]
         await cassandra.execute(cpChannelQuery, params, {prepare: true})
-        // expire customer's cached conversations conversations
-        await expireUserConversationsCached(customerId)
+        // // expire customer's cached conversations conversations
+        // await expireUserConversationsCached(customerId)
         response                = {mqttTopics: followDocument.mqttTopics}
     } else {
         await blockUnblockAllConversations(false, customerId, serviceProviderId)
-        await expireUserConversationsCached(customerId)
+        // await expireUserConversationsCached(customerId)
         const criteria          = {_id: followHistory.followId, customerId, serviceProviderId}
         await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: false, followedAt: new Date()}})
         response                = await mongodb.collection(mongoCollections.followings).findOne(criteria, {mqttTopics: 1})
@@ -204,7 +204,7 @@ const unfollowServiceProvider   = async (customerId, serviceProviderId) => {
     if(follow !== null)         {
         // block all conversations
         await blockUnblockAllConversations(true, customerId, serviceProviderId)
-        await expireUserConversationsCached(customerId)
+        // await expireUserConversationsCached(customerId)
         await mongodb.collection(mongoCollections.followings).updateOne(criteria, {$set: {isDeleted: true}})
         await Promise.all([
             mongodb.collection(mongoCollections.customers).updateOne({_id: customerId}, {$inc: {noOfBusinessesFollowed: -1}}),
@@ -242,16 +242,16 @@ const getUserConversationsPermission    = (requestUser, userId) => {
 module.exports          = {
     getUserConversations,
     getUserAllConversations,
-    getUserConversationsCached,
+    // getUserConversationsCached,
     getCustomersBasicDetailsWithoutCache,
     getServiceProvidersBasicDetailsWithoutCache,
     getCustomersBasicDetailsByIds,
     getServiceProvidersBasicDetailsByIds,
     getUsersBasicDetailsFromConversations,
     paginateConversations,
-    paginateConversationsCached,
+    // paginateConversationsCached,
     getCustomerServiceProviderFollowHistory,
-    expireUserConversationsCached,
+    // expireUserConversationsCached,
     followServiceProvider,
     unfollowServiceProvider,
 

@@ -128,7 +128,7 @@ const changeBlockStatusByConversationId = async (conversationId, userId, block) 
         const blockUpdateQuery  = `UPDATE conversations SET is_blocked = ? WHERE conversation_id = ? AND user_id = ? AND conversation_type = ?`
         const params            = [block, conversationId, otherUserId, constants.conversationTypes.single]
         await cassandra.execute(blockUpdateQuery, params, {prepare: true})
-        await userServices.expireUserConversationsCached(userId)
+        // await userServices.expireUserConversationsCached(userId)
     }
 }
 
